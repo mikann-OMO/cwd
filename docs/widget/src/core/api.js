@@ -17,18 +17,31 @@ export function createApiClient(config) {
 	function getLikeUserId() {
 		try {
 			const storageKey = 'cwd_like_uid';
-			let token = localStorage.getItem(storageKey);
+			let token = null;
+			
+			try {
+				token = localStorage.getItem(storageKey);
+			} catch (storageError) {
+				console.warn('localStorage not available:', storageError);
+			}
+			
 			if (!token) {
 				if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
 					token = crypto.randomUUID();
 				} else {
 					token = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 				}
-				localStorage.setItem(storageKey, token);
+				
+				try {
+					localStorage.setItem(storageKey, token);
+				} catch (saveError) {
+					console.warn('Could not save user ID to localStorage:', saveError);
+				}
 			}
 			return token;
 		} catch (e) {
-			return 'anonymous';
+			console.warn('Error in getLikeUserId:', e);
+			return `fallback_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 		}
 	}
 
@@ -197,7 +210,8 @@ export function createApiClient(config) {
         const response = await fetch(`${baseUrl}/api/comments/like`, {
             method,
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CWD-Like-User': getLikeUserId()
             },
             body: JSON.stringify({ id })
         });
@@ -212,6 +226,34 @@ export function createApiClient(config) {
         return response.json();
     }
 
+    async function getCommentLikeStatus(commentIds) {
+        if (!Array.isArray(commentIds) || commentIds.length === 0) {
+            return { likedIds: [] };
+        }
+        const ids = commentIds
+            .map((id) => {
+                const n = typeof id === 'number' ? id : Number.parseInt(String(id).trim(), 10);
+                return Number.isFinite(n) && n > 0 ? n : null;
+            })
+            .filter((n) => n !== null);
+        if (ids.length === 0) {
+            return { likedIds: [] };
+        }
+        const params = new URLSearchParams({
+            ids: ids.join(',')
+        });
+        const response = await fetch(`${baseUrl}/api/comments/like/status?${params.toString()}`, {
+            method: 'GET',
+            headers: {
+                'X-CWD-Like-User': getLikeUserId()
+            }
+        });
+        if (!response.ok) {
+            return { likedIds: [] };
+        }
+        return response.json();
+    }
+
 		return {
 		fetchComments,
 		submitComment,
@@ -219,6 +261,7 @@ export function createApiClient(config) {
         trackVisit,
         getLikeStatus,
         likePage,
-        likeComment
+        likeComment,
+        getCommentLikeStatus
 	};
 }

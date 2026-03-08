@@ -16,8 +16,9 @@ function loadUserInfo() {
 		const data = localStorage.getItem(STORAGE_KEY);
 		if (data) {
 			const parsed = JSON.parse(data);
+			const name = parsed.name || '';
 			return {
-				name: parsed.name || '',
+				name: name.trim() === 'o' ? '' : name,
 				email: parsed.email || '',
 				url: parsed.url || '',
 			};
@@ -34,7 +35,11 @@ function loadUserInfo() {
  */
 function saveUserInfo(name, email, url) {
 	try {
-		const data = { name, email, url };
+		const data = { 
+			name: name.trim() === 'o' ? '' : name, 
+			email, 
+			url 
+		};
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 	} catch (e) {}
 }
@@ -91,9 +96,10 @@ class Store {
  * @param {Function} fetchComments - 获取评论的函数
  * @param {Function} submitComment - 提交评论的函数
  * @param {Function} likeCommentFn - 点赞评论的函数
+ * @param {Function} getCommentLikeStatusFn - 获取评论点赞状态的函数
  * @returns {Object}
  */
-export function createCommentStore(config, fetchComments, submitComment, likeCommentFn) {
+export function createCommentStore(config, fetchComments, submitComment, likeCommentFn, getCommentLikeStatusFn) {
 	// 从 localStorage 加载用户信息
 	const savedInfo = loadUserInfo();
 
@@ -130,6 +136,7 @@ export function createCommentStore(config, fetchComments, submitComment, likeCom
 		likeCount: 0,
 		liked: false,
 		commentLikeLoadingId: null,
+		likedCommentIds: new Set(),
 	});
 
 	// 监听用户信息变化，自动保存到 localStorage
@@ -165,6 +172,34 @@ export function createCommentStore(config, fetchComments, submitComment, likeCom
 				},
 				loading: false,
 			});
+
+			if (getCommentLikeStatusFn && response.data && response.data.length > 0) {
+				const allIds = [];
+				response.data.forEach((item) => {
+					if (item && typeof item.id === 'number') {
+						allIds.push(item.id);
+					}
+					if (Array.isArray(item.replies)) {
+						item.replies.forEach((reply) => {
+							if (reply && typeof reply.id === 'number') {
+								allIds.push(reply.id);
+							}
+						});
+					}
+				});
+				if (allIds.length > 0) {
+					try {
+						const likeStatus = await getCommentLikeStatusFn(allIds);
+						if (likeStatus && Array.isArray(likeStatus.likedIds)) {
+							store.setState({
+								likedCommentIds: new Set(likeStatus.likedIds),
+							});
+						}
+					} catch (e) {
+						console.warn('Failed to fetch comment like status:', e);
+					}
+				}
+			}
 		} catch (e) {
 			store.setState({
 				error: e instanceof Error ? e.message : '加载评论失败',
@@ -404,7 +439,11 @@ export function createCommentStore(config, fetchComments, submitComment, likeCom
 	 */
 	function updateFormField(field, value) {
 		const form = { ...store.getState().form };
-		form[field] = value;
+		if (field === 'name' && value.trim() === 'o') {
+			form[field] = '';
+		} else {
+			form[field] = value;
+		}
 		store.setState({ form });
 	}
 
@@ -453,6 +492,30 @@ export function createCommentStore(config, fetchComments, submitComment, likeCom
 		}
 	}
 
+	function isCommentLiked(commentId) {
+		const state = store.getState();
+		const id = typeof commentId === 'number' ? commentId : Number.parseInt(String(commentId).trim(), 10);
+		if (!Number.isFinite(id) || id <= 0) {
+			return false;
+		}
+		return state.likedCommentIds.has(id);
+	}
+
+	function markCommentLiked(commentId, liked) {
+		const state = store.getState();
+		const id = typeof commentId === 'number' ? commentId : Number.parseInt(String(commentId).trim(), 10);
+		if (!Number.isFinite(id) || id <= 0) {
+			return;
+		}
+		const newSet = new Set(state.likedCommentIds);
+		if (liked) {
+			newSet.add(id);
+		} else {
+			newSet.delete(id);
+		}
+		store.setState({ likedCommentIds: newSet });
+	}
+
 		return {
 		// Store 实例
 		store,
@@ -477,5 +540,7 @@ export function createCommentStore(config, fetchComments, submitComment, likeCom
 		goToPage,
 		setLikeState,
 		likeComment,
+		isCommentLiked,
+		markCommentLiked,
 	};
 }

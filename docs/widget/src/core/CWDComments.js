@@ -242,6 +242,7 @@ export class CWDComments {
           api.fetchComments.bind(api),
           api.submitComment.bind(api),
           typeof api.likeComment === 'function' ? api.likeComment.bind(api) : undefined,
+          typeof api.getCommentLikeStatus === 'function' ? api.getCommentLikeStatus.bind(api) : undefined,
         );
 
 				this.unsubscribe = this.store.store.subscribe((state, prevState) => {
@@ -451,9 +452,14 @@ export class CWDComments {
 				submitting: state.submitting,
 				currentUser: state.form,
 				onUpdateUserInfo: (field, value) => this.store.updateFormField(field, value),
-				// adminEmail 已移除，前端展示改用 isAdmin 字段
 				adminBadge: this.config.adminBadge,
 				enableCommentLike: this.config.enableCommentLike !== false,
+				isCommentLiked: (commentId) => {
+					if (this.store && typeof this.store.isCommentLiked === 'function') {
+						return this.store.isCommentLiked(commentId);
+					}
+					return false;
+				},
 				onRetry: () => this.store.loadComments(),
 				onReply: (commentId) => this.store.startReply(commentId),
 				onSubmitReply: (commentId) => this.store.submitReply(commentId),
@@ -467,6 +473,9 @@ export class CWDComments {
 				onLikeComment: (commentId, isLike) => {
 					if (this.store && typeof this.store.likeComment === 'function') {
 						this.store.likeComment(commentId, isLike);
+						if (typeof this.store.markCommentLiked === 'function') {
+							this.store.markCommentLiked(commentId, true);
+						}
 					}
 				},
 				t: this.t
@@ -580,6 +589,20 @@ export class CWDComments {
 				replyError: state.replyError,
 				submitting: state.submitting,
 				currentUser: state.form,
+				isCommentLiked: (commentId) => {
+					if (this.store && typeof this.store.isCommentLiked === 'function') {
+						return this.store.isCommentLiked(commentId);
+					}
+					return false;
+				},
+				onLikeComment: (commentId, isLike) => {
+					if (this.store && typeof this.store.likeComment === 'function') {
+						this.store.likeComment(commentId, isLike);
+						if (typeof this.store.markCommentLiked === 'function') {
+							this.store.markCommentLiked(commentId, true);
+						}
+					}
+				},
 			});
 		}
 
@@ -652,7 +675,13 @@ export class CWDComments {
 				this.unsubscribe();
 			}
 
-			this.store = createCommentStore(this.config, api.fetchComments.bind(api), api.submitComment.bind(api));
+			this.store = createCommentStore(
+				this.config,
+				api.fetchComments.bind(api),
+				api.submitComment.bind(api),
+				typeof api.likeComment === 'function' ? api.likeComment.bind(api) : undefined,
+				typeof api.getCommentLikeStatus === 'function' ? api.getCommentLikeStatus.bind(api) : undefined,
+			);
 
 			this.unsubscribe = this.store.store.subscribe((state, prevState) => {
 				this._onStateChange(state, prevState);

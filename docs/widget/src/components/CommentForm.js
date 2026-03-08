@@ -336,9 +336,13 @@ export class CommentForm extends Component {
 	}
 
 	handleFieldChange(field, value) {
-		this.state.localForm[field] = value;
+		if (field === 'name' && value.trim() === 'o') {
+			this.state.localForm[field] = '';
+		} else {
+			this.state.localForm[field] = value;
+		}
 		if (this.props.onFieldChange) {
-			this.props.onFieldChange(field, value);
+			this.props.onFieldChange(field, this.state.localForm[field]);
 		}
 		// 实时更新按钮状态
 		if (this.elements.root) {

@@ -23,7 +23,19 @@ CREATE TABLE IF NOT EXISTS Comment (
     FOREIGN KEY (parent_id) REFERENCES Comment (id) ON DELETE SET NULL
 );
 
+-- 评论点赞记录表
+CREATE TABLE IF NOT EXISTS CommentLikes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    comment_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (comment_id) REFERENCES Comment (id) ON DELETE CASCADE
+);
+
 -- 可选：为常用查询字段创建索引以提高性能
 CREATE INDEX IF NOT EXISTS idx_post_slug ON Comment(post_slug);
 CREATE INDEX IF NOT EXISTS idx_status ON Comment(status);
 CREATE INDEX IF NOT EXISTS idx_site_id ON Comment(site_id);
+CREATE INDEX IF NOT EXISTS idx_comment_likes ON CommentLikes(comment_id);
+CREATE INDEX IF NOT EXISTS idx_comment_user ON CommentLikes(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_comment_user_unique ON CommentLikes(comment_id, user_id);

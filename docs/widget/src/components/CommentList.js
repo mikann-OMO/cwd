@@ -7,46 +7,24 @@ import { CommentItem } from './CommentItem.js';
 import { Loading } from './Loading.js';
 import { Pagination } from './Pagination.js';
 
+const MOBILE_THRESHOLD = 768;
+const isMobileDevice = typeof window !== 'undefined' && window.innerWidth <= MOBILE_THRESHOLD;
+
 export class CommentList extends Component {
-  /**
-   * @param {HTMLElement|string} container - 容器元素或选择器
-   * @param {Object} props - 组件属性
-   * @param {Array} props.comments - 评论列表
-   * @param {boolean} props.loading - 是否正在加载
-   * @param {string|null} props.error - 错误信息
-   * @param {number} props.currentPage - 当前页码
-   * @param {number} props.totalPages - 总页数
-   * @param {number|null} props.replyingTo - 当前正在回复的评论 ID
-   * @param {string} props.replyContent - 回复内容
-   * @param {string|null} props.replyError - 回复错误
-   * @param {boolean} props.submitting - 是否正在提交
-   * @param {Function} props.onRetry - 重试回调
-   * @param {Function} props.onReply - 回复回调
-   * @param {Function} props.onSubmitReply - 提交回复回调
-   * @param {Function} props.onCancelReply - 取消回复回调
-   * @param {Function} props.onUpdateReplyContent - 更新回复内容回调
-   * @param {Function} props.onClearReplyError - 清除回复错误回调
-   * @param {Function} props.onPrevPage - 上一页回调
-   * @param {Function} props.onNextPage - 下一页回调
-   * @param {Function} props.onGoToPage - 跳转页码回调
-   * @param {string} props.adminEmail - 博主邮箱（可选）
-   * @param {string} props.adminBadge - 博主标识文字（可选）
-   * @param {boolean} props.enableCommentLike - 是否开启评论点赞
-   */
   constructor(container, props = {}) {
     super(container, props);
     this.t = props.t || ((k) => k);
     this.loadingComponent = null;
     this.paginationComponent = null;
-    this.commentItems = new Map(); // 缓存 CommentItem 实例，key 为 comment.id
+    this.commentItems = new Map();
+    this._renderScheduled = false;
+    this._pendingProps = null;
   }
 
   render() {
     const { comments, loading, error, currentPage, totalPages } = this.props;
-    // 清空容器
     this.empty(this.container);
 
-    // 加载状态
     if (loading && comments.length === 0) {
       this.loadingComponent = new Loading(this.container, { text: '加载评论中...' });
       this.loadingComponent.render();
@@ -54,7 +32,6 @@ export class CommentList extends Component {
       return;
     }
 
-    // 错误状态
     if (error && comments.length === 0) {
       const errorEl = this.createElement('div', {
         className: 'cwd-error',
@@ -75,49 +52,27 @@ export class CommentList extends Component {
       return;
     }
 
-    // 评论列表容器
     const root = this.createElement('div', {
       className: 'cwd-comment-list'
     });
 
-    // 评论列表
     if (comments.length > 0) {
       const commentsContainer = this.createElement('div', {
         className: 'cwd-comments'
       });
 
-      // 清空旧的缓存
       this.commentItems.clear();
 
-      comments.forEach((comment, index) => {
-        const commentItem = new CommentItem(commentsContainer, {
-          comment,
-          replyingTo: this.props.replyingTo,
-          replyContent: this.props.replyContent,
-          replyError: this.props.replyError,
-          submitting: this.props.submitting,
-          currentUser: this.props.currentUser,
-          onUpdateUserInfo: this.props.onUpdateUserInfo,
-          // adminEmail 已移除，改用 comment.isAdmin 字段
-          adminBadge: this.props.adminBadge,
-          enableCommentLike: this.props.enableCommentLike,
-          replyPlaceholder: this.props.replyPlaceholder,
-          onReply: (commentId) => this.handleReply(commentId),
-          onSubmitReply: (commentId) => this.handleSubmitReply(commentId),
-          onCancelReply: () => this.handleCancelReply(),
-          onUpdateReplyContent: (content) => this.handleUpdateReplyContent(content),
-          onClearReplyError: () => this.handleClearReplyError(),
-          onLikeComment: (commentId, isLike) => this.handleLikeComment(commentId, isLike),
-          t: this.props.t
+      if (isMobileDevice && comments.length > 10) {
+        this._renderCommentsBatched(commentsContainer, comments, 0);
+      } else {
+        comments.forEach((comment) => {
+          this._renderCommentItem(commentsContainer, comment);
         });
-        commentItem.render();
-        // 缓存 CommentItem 实例
-        this.commentItems.set(comment.id, commentItem);
-      });
+      }
 
       root.appendChild(commentsContainer);
     } else {
-      // 空状态
       const emptyEl = this.createElement('div', {
         className: 'cwd-empty',
         children: [
@@ -127,7 +82,6 @@ export class CommentList extends Component {
       root.appendChild(emptyEl);
     }
 
-    // 分页
     if (totalPages > 1) {
       const paginationContainer = this.createElement('div');
       root.appendChild(paginationContainer);
@@ -148,40 +102,83 @@ export class CommentList extends Component {
     this.container.appendChild(root);
   }
 
+  _renderCommentsBatched(container, comments, startIndex) {
+    const batchSize = 5;
+    const endIndex = Math.min(startIndex + batchSize, comments.length);
+
+    for (let i = startIndex; i < endIndex; i++) {
+      this._renderCommentItem(container, comments[i]);
+    }
+
+    if (endIndex < comments.length) {
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(() => {
+          this._renderCommentsBatched(container, comments, endIndex);
+        }, { timeout: 100 });
+      } else {
+        setTimeout(() => {
+          this._renderCommentsBatched(container, comments, endIndex);
+        }, 16);
+      }
+    }
+  }
+
+  _renderCommentItem(container, comment) {
+    const commentItem = new CommentItem(container, {
+      comment,
+      replyingTo: this.props.replyingTo,
+      replyContent: this.props.replyContent,
+      replyError: this.props.replyError,
+      submitting: this.props.submitting,
+      currentUser: this.props.currentUser,
+      onUpdateUserInfo: this.props.onUpdateUserInfo,
+      adminBadge: this.props.adminBadge,
+      enableCommentLike: this.props.enableCommentLike,
+      replyPlaceholder: this.props.replyPlaceholder,
+      isCommentLiked: this.props.isCommentLiked,
+      onReply: (commentId) => this.handleReply(commentId),
+      onSubmitReply: (commentId) => this.handleSubmitReply(commentId),
+      onCancelReply: () => this.handleCancelReply(),
+      onUpdateReplyContent: (content) => this.handleUpdateReplyContent(content),
+      onClearReplyError: () => this.handleClearReplyError(),
+      onLikeComment: (commentId, isLike) => this.handleLikeComment(commentId, isLike),
+      t: this.props.t
+    });
+    commentItem.render();
+    this.commentItems.set(comment.id, commentItem);
+  }
+
   updateProps(prevProps) {
-    // 如果状态从加载变为非加载，需要完全重新渲染
     if (this.props.loading !== prevProps.loading && !this.props.loading) {
       this.render();
       return;
     }
 
-    // 如果评论列表变化，重新渲染
     if (this.props.comments !== prevProps.comments) {
       this.render();
       return;
     }
 
-    // 如果只是回复状态变化，局部更新 CommentItem 而不是完全重新渲染
     if (this.props.replyingTo !== prevProps.replyingTo ||
         this.props.replyError !== prevProps.replyError ||
         this.props.submitting !== prevProps.submitting ||
         this.props.currentUser !== prevProps.currentUser) {
-      // 局部更新所有 CommentItem
-      this.commentItems.forEach((commentItem) => {
-        commentItem.setProps({
-          replyingTo: this.props.replyingTo,
-          replyContent: this.props.replyContent,
-          replyError: this.props.replyError,
-          submitting: this.props.submitting,
-          currentUser: this.props.currentUser,
-          enableCommentLike: this.props.enableCommentLike,
-          onLikeComment: (commentId, isLike) => this.handleLikeComment(commentId, isLike)
+      this._scheduleUpdate(() => {
+        this.commentItems.forEach((commentItem) => {
+          commentItem.setProps({
+            replyingTo: this.props.replyingTo,
+            replyContent: this.props.replyContent,
+            replyError: this.props.replyError,
+            submitting: this.props.submitting,
+            currentUser: this.props.currentUser,
+            enableCommentLike: this.props.enableCommentLike,
+            onLikeComment: (commentId, isLike) => this.handleLikeComment(commentId, isLike)
+          });
         });
       });
       return;
     }
 
-    // 如果分页信息变化，更新分页组件
     if (this.paginationComponent) {
       const pageChanged =
         this.props.currentPage !== prevProps.currentPage ||
@@ -192,6 +189,24 @@ export class CommentList extends Component {
         this.paginationComponent.props.totalPages = this.props.totalPages;
         this.paginationComponent.updateProps();
       }
+    }
+  }
+
+  _scheduleUpdate(updateFn) {
+    if (isMobileDevice) {
+      this._pendingProps = updateFn;
+      if (!this._renderScheduled) {
+        this._renderScheduled = true;
+        requestAnimationFrame(() => {
+          this._renderScheduled = false;
+          if (this._pendingProps) {
+            this._pendingProps();
+            this._pendingProps = null;
+          }
+        });
+      }
+    } else {
+      updateFn();
     }
   }
 

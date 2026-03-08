@@ -353,93 +353,26 @@ export class CommentItem extends Component {
 
 		const commentId = String(this.props.comment.id);
 
-		// 防抖检查：1 秒内同一评论只能操作一次
 		const now = Date.now();
-		const debounceKey = `${this.getUserId()}_${commentId}`;
+		const debounceKey = commentId;
 		const lastClick = CommentItem._likeDebounce.get(debounceKey);
 		if (lastClick && now - lastClick < 1000) {
 			return;
 		}
 		CommentItem._likeDebounce.set(debounceKey, now);
 
-		// 获取当前点赞状态
-		const likedComments = this.getLikedComments();
-		const hasLiked = likedComments.has(commentId);
+		const hasLiked = this.hasLiked(commentId);
 
 		if (!hasLiked) {
-			// 未点赞，执行点赞
-			likedComments.add(commentId);
-			this.saveLikedComments(likedComments);
 			this.props.onLikeComment(commentId, true);
 		}
-		// 已点赞则不做任何操作
 	}
 
-	/**
-	 * 获取用户唯一标识
-	 * 使用静态缓存确保一致性
-	 * @returns {string} 用户ID
-	 */
-	getUserId() {
-		if (CommentItem._userId) {
-			return CommentItem._userId;
-		}
-
-		const STORAGE_KEY = 'cwd_comment_user_id';
-		let userId = localStorage.getItem(STORAGE_KEY);
-
-		if (!userId) {
-			// 生成简单的用户ID
-			userId = 'u_' + Date.now() + '_' + Math.random().toString(36).substring(2, 12);
-			localStorage.setItem(STORAGE_KEY, userId);
-		}
-
-		CommentItem._userId = userId;
-		return userId;
-	}
-
-	/**
-	 * 获取已点赞的评论ID集合
-	 * @returns {Set<string>} 已点赞的评论ID集合
-	 */
-	getLikedComments() {
-		const userId = this.getUserId();
-		const key = `cwd_comment_liked_${userId}`;
-		const data = localStorage.getItem(key);
-		const likedSet = new Set();
-
-		if (data) {
-			try {
-				const parsed = JSON.parse(data);
-				if (Array.isArray(parsed)) {
-					parsed.forEach((id) => likedSet.add(String(id)));
-				}
-			} catch (e) {
-				// 解析失败，返回空集合
-			}
-		}
-
-		return likedSet;
-	}
-
-	/**
-	 * 保存点赞记录到 localStorage
-	 * @param {Set} likedSet - 点赞集合
-	 */
-	saveLikedComments(likedSet) {
-		const userId = this.getUserId();
-		const key = `cwd_comment_liked_${userId}`;
-		localStorage.setItem(key, JSON.stringify(Array.from(likedSet)));
-	}
-
-	/**
-	 * 检查是否已点赞
-	 * @param {string|number} commentId - 评论 ID
-	 * @returns {boolean} 是否已点赞
-	 */
 	hasLiked(commentId) {
-		const likedComments = this.getLikedComments();
-		return likedComments.has(String(commentId));
+		if (typeof this.props.isCommentLiked === 'function') {
+			return this.props.isCommentLiked(commentId);
+		}
+		return false;
 	}
 
 	handleSubmitReply() {

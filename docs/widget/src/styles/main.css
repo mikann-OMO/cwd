@@ -1122,3 +1122,57 @@
     background: rgba(0, 0, 0, 0.5);
   }
 }
+
+/* 移动端性能优化 */
+@media (max-width: 768px) {
+  .cwd-comment-item {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 120px;
+  }
+
+  .cwd-comment-list {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 500px;
+  }
+
+  .cwd-comments {
+    will-change: auto;
+  }
+
+  .cwd-comment-content {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .cwd-form-row {
+    gap: 8px;
+  }
+
+  .cwd-comment-form {
+    padding: 12px;
+  }
+
+  .cwd-comment-avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .cwd-author-name {
+    font-size: 14px;
+  }
+
+  .cwd-comment-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .cwd-replies {
+    padding-left: 8px;
+    margin-top: 8px;
+  }
+
+  .cwd-comment-reply .cwd-comment-avatar {
+    width: 24px;
+    height: 24px;
+  }
+}

@@ -30,7 +30,7 @@ import { getSites } from './api/admin/getDomains';
 import { trackVisit } from './api/public/trackVisit';
 import { getVisitOverview, getVisitPages } from './api/admin/visitAnalytics';
 import { getLikeStatus, likePage } from './api/public/like';
-import { likeComment } from './api/public/likeComment';
+import { likeComment, unlikeComment, getCommentLikeStatus } from './api/public/likeComment';
 import { listLikes } from './api/admin/listLikes';
 import { getLikeStats } from './api/admin/likeStats';
 import { getFeatureSettings, updateFeatureSettings } from './api/admin/featureSettings';
@@ -271,6 +271,8 @@ app.post('/api/analytics/visit', trackVisit);
 app.get('/api/like', getLikeStatus);
 app.post('/api/like', likePage);
 app.post('/api/comments/like', likeComment);
+app.delete('/api/comments/like', unlikeComment);
+app.get('/api/comments/like/status', getCommentLikeStatus);
 app.post('/api/telegram/webhook', telegramWebhook);
 app.get('/api/config/comments', async (c) => {
 	try {
