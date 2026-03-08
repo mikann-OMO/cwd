@@ -19,10 +19,18 @@ export class CommentList extends Component {
     this.commentItems = new Map();
     this._renderScheduled = false;
     this._pendingProps = null;
+    this._lastCommentIds = new Set();
   }
 
   render() {
     const { comments, loading, error, currentPage, totalPages } = this.props;
+    
+    this.commentItems.forEach((item) => {
+      if (item && typeof item.destroy === 'function') {
+        item.destroy();
+      }
+    });
+    this.commentItems.clear();
     this.empty(this.container);
 
     if (loading && comments.length === 0) {
@@ -61,7 +69,7 @@ export class CommentList extends Component {
         className: 'cwd-comments'
       });
 
-      this.commentItems.clear();
+      this._lastCommentIds = new Set(comments.map(c => c.id));
 
       if (isMobileDevice && comments.length > 10) {
         this._renderCommentsBatched(commentsContainer, comments, 0);
@@ -154,7 +162,13 @@ export class CommentList extends Component {
       return;
     }
 
-    if (this.props.comments !== prevProps.comments) {
+    const currentCommentIds = new Set(this.props.comments.map(c => c.id));
+    const commentListsDiffer = 
+      this.props.comments !== prevProps.comments ||
+      currentCommentIds.size !== this._lastCommentIds.size ||
+      [...currentCommentIds].some(id => !this._lastCommentIds.has(id));
+
+    if (commentListsDiffer) {
       this.render();
       return;
     }
@@ -172,6 +186,7 @@ export class CommentList extends Component {
             submitting: this.props.submitting,
             currentUser: this.props.currentUser,
             enableCommentLike: this.props.enableCommentLike,
+            isCommentLiked: this.props.isCommentLiked,
             onLikeComment: (commentId, isLike) => this.handleLikeComment(commentId, isLike)
           });
         });
@@ -268,5 +283,15 @@ export class CommentList extends Component {
     if (this.props.onGoToPage) {
       this.props.onGoToPage(page);
     }
+  }
+
+  destroy() {
+    this.commentItems.forEach((item) => {
+      if (item && typeof item.destroy === 'function') {
+        item.destroy();
+      }
+    });
+    this.commentItems.clear();
+    super.destroy();
   }
 }

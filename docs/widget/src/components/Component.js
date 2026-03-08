@@ -6,10 +6,6 @@
  * 基础组件类
  */
 export class Component {
-  /**
-   * @param {HTMLElement|string} container - 容器元素或选择器
-   * @param {Object} props - 组件属性
-   */
   constructor(container, props = {}) {
     this.container = typeof container === 'string'
       ? document.querySelector(container)
@@ -18,6 +14,28 @@ export class Component {
     this.state = {};
     this.elements = {};
     this.destroyed = false;
+    this._eventListeners = new Map();
+  }
+
+  _addEventListener(el, event, handler) {
+    const key = `${event}_${Date.now()}_${Math.random()}`;
+    el.addEventListener(event, handler);
+    if (!this._eventListeners.has(el)) {
+      this._eventListeners.set(el, []);
+    }
+    this._eventListeners.get(el).push({ event, handler, key });
+    return key;
+  }
+
+  _removeAllEventListeners() {
+    this._eventListeners.forEach((listeners, el) => {
+      listeners.forEach(({ event, handler }) => {
+        try {
+          el.removeEventListener(event, handler);
+        } catch (e) {}
+      });
+    });
+    this._eventListeners.clear();
   }
 
   /**
@@ -48,11 +66,8 @@ export class Component {
     this.updateProps(prevProps);
   }
 
-  /**
-   * 渲染组件 - 子类实现
-   */
   render() {
-    // 子类实现
+    this._removeAllEventListeners();
   }
 
   /**
@@ -77,6 +92,7 @@ export class Component {
    */
   destroy() {
     this.destroyed = true;
+    this._removeAllEventListeners();
     if (this.container && this.elements.root && this.elements.root.parentNode) {
       this.elements.root.parentNode.removeChild(this.elements.root);
     }
@@ -138,7 +154,7 @@ export class Component {
       Object.entries(options.attributes).forEach(([key, value]) => {
         if (key.startsWith('on')) {
           const event = key.slice(2).toLowerCase();
-          el.addEventListener(event, value);
+          this._addEventListener(el, event, value);
         } else if (key === 'dataset') {
           Object.entries(value).forEach(([dataKey, dataValue]) => {
             el.dataset[dataKey] = dataValue;

@@ -1123,6 +1123,35 @@
   }
 }
 
+/* ========== 全局移动端优化 ========== */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+button,
+.cwd-action-btn,
+.cwd-comment-like-button,
+.cwd-like-button,
+.cwd-page-btn,
+.cwd-error-retry {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  -moz-user-select: none;
+  touch-action: manipulation;
+  pointer-events: auto;
+}
+
+button:disabled,
+.cwd-page-btn:disabled {
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
 /* 移动端性能优化 */
 @media (max-width: 768px) {
   .cwd-comment-item {
@@ -1174,5 +1203,12 @@
   .cwd-comment-reply .cwd-comment-avatar {
     width: 24px;
     height: 24px;
+  }
+
+  .cwd-comment-like-button,
+  .cwd-action-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px 12px;
   }
 }
